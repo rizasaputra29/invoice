@@ -80,3 +80,46 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  /* Hide everything by default */
+  body > * {
+    display: none !important;
+  }
+
+  /* Only show the invoice preview modal content */
+  /* We use the specific structure of the InvoicePreview component */
+  body > div:has(.print\:block) {
+    display: block !important;
+    position: static !important;
+    background: white !important;
+    height: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Target the specific container inside InvoicePreview */
+  .print\:block {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Ensure the inner content is visible */
+  .print\:block > div {
+    margin: 0 !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Hide the modal header/close button which has 'print:hidden' class */
+  .print\:hidden {
+    display: none !important;
+  }
+}

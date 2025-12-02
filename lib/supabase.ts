@@ -26,7 +26,7 @@ export type Invoice = {
 export type InvoiceItem = {
   id: string;
   invoice_id: string;
-  description: string;
+  description: string; 
   quantity: number;
   unit_price: number;
   amount: number;

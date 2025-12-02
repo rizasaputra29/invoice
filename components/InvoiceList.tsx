@@ -5,6 +5,7 @@ import { supabase, type Invoice } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Eye, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -137,7 +138,7 @@ export default function InvoiceList({ refresh, onViewInvoice }: InvoiceListProps
                     {new Date(invoice.due_date).toLocaleDateString()}
                   </td>
                   <td className="p-4 font-mono font-bold">
-                    ${Number(invoice.total).toFixed(2)}
+                    {formatCurrency(invoice.total)}
                   </td>
                   <td className="p-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${getStatusColor(invoice.status)}`}>

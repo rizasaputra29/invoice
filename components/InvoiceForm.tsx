@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Save } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 
 type LineItem = {
   id: string;
+  name: string;
   description: string;
   quantity: number;
   unit_price: number;
@@ -29,11 +30,11 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
   const [clientAddress, setClientAddress] = useState('');
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
-  const [status, setStatus] = useState<'draft' | 'sent' | 'paid' | 'overdue'>('draft');
+  const status = 'draft';
   const [taxRate, setTaxRate] = useState(0);
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<LineItem[]>([
-    { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0 }
+    { id: crypto.randomUUID(), name: '', description: '', quantity: 0, unit_price: 0, amount: 0 }
   ]);
 
   const calculateSubtotal = () => {
@@ -49,7 +50,7 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
   };
 
   const addItem = () => {
-    setItems([...items, { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0 }]);
+    setItems([...items, { id: crypto.randomUUID(), name: '', description: '', quantity: 0, unit_price: 0, amount: 0 }]);
   };
 
   const removeItem = (id: string) => {
@@ -63,7 +64,10 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
         if (field === 'quantity' || field === 'unit_price') {
-          updated.amount = Number(updated.quantity) * Number(updated.unit_price);
+          // If the value is empty string (user cleared input), treat as 0 for calculation
+          const qty = field === 'quantity' ? (value === '' ? 0 : Number(value)) : item.quantity;
+          const price = field === 'unit_price' ? (value === '' ? 0 : Number(value)) : item.unit_price;
+          updated.amount = qty * price;
         }
         return updated;
       }
@@ -87,8 +91,8 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
       return;
     }
 
-    if (items.some(item => !item.description || item.quantity <= 0 || item.unit_price <= 0)) {
-      toast.error('Please complete all line items');
+    if (items.some(item => !item.name || item.quantity <= 0 || item.unit_price < 0)) {
+      toast.error('Please check your line items (Name is required, Qty must be > 0)');
       return;
     }
 
@@ -121,9 +125,12 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
 
       if (invoiceError) throw invoiceError;
 
+      // Combine Name and Description into the 'description' column
       const itemsToInsert = items.map(item => ({
         invoice_id: invoice.id,
-        description: item.description,
+        description: item.description 
+          ? `${item.name}\n${item.description}` 
+          : item.name,
         quantity: item.quantity,
         unit_price: item.unit_price,
         amount: item.amount,
@@ -152,17 +159,14 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
     setClientAddress('');
     setIssueDate(new Date().toISOString().split('T')[0]);
     setDueDate('');
-    setStatus('draft');
     setTaxRate(0);
     setNotes('');
-    setItems([{ id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0 }]);
+    setItems([{ id: crypto.randomUUID(), name: '', description: '', quantity: 0, unit_price: 0, amount: 0 }]);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 bg-white border border-black p-8">
+    <form onSubmit={handleSubmit} className="space-y-8 bg-white">
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold">Create Invoice</h2>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="clientName">Client Name *</Label>
@@ -224,21 +228,6 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select value={status} onValueChange={(value: any) => setStatus(value)}>
-              <SelectTrigger className="border-black">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="taxRate">Tax Rate (%)</Label>
             <Input
               id="taxRate"
@@ -246,9 +235,10 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
               step="0.01"
               min="0"
               max="100"
-              value={taxRate}
-              onChange={(e) => setTaxRate(Number(e.target.value))}
+              value={taxRate === 0 ? '' : taxRate}
+              onChange={(e) => setTaxRate(e.target.value === '' ? 0 : Number(e.target.value))}
               className="border-black"
+              placeholder="0"
             />
           </div>
         </div>
@@ -265,16 +255,23 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
 
         <div className="space-y-4">
           {items.map((item) => (
-            <div key={item.id} className="grid grid-cols-12 gap-4 items-end border border-black p-4">
+            <div key={item.id} className="grid grid-cols-12 gap-4 items-start border border-black p-4">
               <div className="col-span-12 md:col-span-5 space-y-2">
-                <Label htmlFor={`description-${item.id}`}>Description *</Label>
+                <Label htmlFor={`name-${item.id}`}>Item Name *</Label>
+                <Input
+                  id={`name-${item.id}`}
+                  value={item.name}
+                  onChange={(e) => updateItem(item.id, 'name', e.target.value)}
+                  className="border-black"
+                  placeholder="Item Name"
+                  required
+                />
                 <Input
                   id={`description-${item.id}`}
                   value={item.description}
                   onChange={(e) => updateItem(item.id, 'description', e.target.value)}
                   className="border-black"
-                  placeholder="Service or product description"
-                  required
+                  placeholder="Description (Optional)"
                 />
               </div>
 
@@ -285,9 +282,10 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
                   type="number"
                   step="0.01"
                   min="0.01"
-                  value={item.quantity}
-                  onChange={(e) => updateItem(item.id, 'quantity', Number(e.target.value))}
+                  value={item.quantity === 0 ? '' : item.quantity}
+                  onChange={(e) => updateItem(item.id, 'quantity', e.target.value === '' ? '' : Number(e.target.value))}
                   className="border-black"
+                  placeholder="0"
                   required
                 />
               </div>
@@ -299,21 +297,22 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={item.unit_price}
-                  onChange={(e) => updateItem(item.id, 'unit_price', Number(e.target.value))}
+                  value={item.unit_price === 0 ? '' : item.unit_price}
+                  onChange={(e) => updateItem(item.id, 'unit_price', e.target.value === '' ? '' : Number(e.target.value))}
                   className="border-black"
+                  placeholder="0"
                   required
                 />
               </div>
 
               <div className="col-span-3 md:col-span-2 space-y-2">
                 <Label>Amount</Label>
-                <div className="h-10 flex items-center font-mono">
-                  ${item.amount.toFixed(2)}
+                <div className="h-10 flex items-center font-mono text-sm">
+                  {formatCurrency(item.amount)}
                 </div>
               </div>
 
-              <div className="col-span-1 md:col-span-1">
+              <div className="col-span-1 md:col-span-1 pt-8">
                 <Button
                   type="button"
                   onClick={() => removeItem(item.id)}
@@ -333,15 +332,15 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
           <div className="w-full md:w-1/3 space-y-2">
             <div className="flex justify-between text-sm">
               <span>Subtotal:</span>
-              <span className="font-mono">${calculateSubtotal().toFixed(2)}</span>
+              <span className="font-mono">{formatCurrency(calculateSubtotal())}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span>Tax ({taxRate}%):</span>
-              <span className="font-mono">${calculateTaxAmount().toFixed(2)}</span>
+              <span className="font-mono">{formatCurrency(calculateTaxAmount())}</span>
             </div>
             <div className="flex justify-between text-lg font-bold border-t border-black pt-2">
               <span>Total:</span>
-              <span className="font-mono">${calculateTotal().toFixed(2)}</span>
+              <span className="font-mono">{formatCurrency(calculateTotal())}</span>
             </div>
           </div>
         </div>
@@ -359,13 +358,13 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
         />
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex justify-end gap-4">
+        <Button type="button" onClick={resetForm} variant="outline" className="border-black">
+          Reset
+        </Button>
         <Button type="submit" disabled={loading} className="bg-black text-white hover:bg-gray-800">
           <Save className="w-4 h-4 mr-2" />
           {loading ? 'Creating...' : 'Create Invoice'}
-        </Button>
-        <Button type="button" onClick={resetForm} variant="outline" className="border-black">
-          Reset
         </Button>
       </div>
     </form>
