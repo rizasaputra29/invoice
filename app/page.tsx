@@ -7,17 +7,9 @@ import InvoicePreview from '@/components/InvoicePreview';
 import Auth from '@/components/Auth';
 import { Toaster } from 'sonner';
 import { FileText, Plus, LogOut } from 'lucide-react';
-import type { Invoice } from '@/lib/supabase';
-import { supabase } from '@/lib/supabase';
+import { supabase, type Invoice } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -31,81 +23,63 @@ export default function Home() {
       setSession(session);
       setLoading(false);
     });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
   const handleInvoiceCreated = () => {
     setRefreshKey((prev) => prev + 1);
-    setIsDialogOpen(false); // Close dialog on success
+    setIsDialogOpen(false);
   };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-white">Loading...</div>;
 
-  if (!session) {
-    return (
-      <>
-        <Toaster position="top-right" />
-        <Auth />
-      </>
-    );
-  }
+  if (!session) return <><Toaster position="top-right" /><Auth /></>;
 
   return (
     <>
       <Toaster position="top-right" />
-
       <div className="min-h-screen bg-white">
-        <header className="border-b-4 border-black bg-white sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 py-6">
+        <header className="border-b border-gray-200 bg-white sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <FileText className="w-8 h-8" />
-                <h1 className="text-3xl font-bold">Invoice Generator</h1>
+                <div className="bg-black text-white p-1.5 rounded">
+                   <FileText className="w-5 h-5" />
+                </div>
+                <h1 className="text-xl font-bold tracking-tight">INNOVUS <span className="font-normal text-gray-500 text-base">Generator</span></h1>
               </div>
-              <Button onClick={handleSignOut} variant="ghost" size="sm">
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
+              <Button onClick={handleSignOut} variant="ghost" size="sm" className="text-gray-500 hover:text-black">
+                <LogOut className="w-4 h-4 mr-2" /> Sign Out
               </Button>
             </div>
-            <p className="text-sm text-gray-600 mt-1">Create and manage professional invoices</p>
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 py-12 space-y-12">
-          <section className="flex justify-end">
+        <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+          <section className="flex justify-between items-center">
+            <div>
+               <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+               <p className="text-gray-500 text-sm">Manage your billing and invoices.</p>
+            </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-black text-white hover:bg-gray-800 h-12 px-6">
-                  <Plus className="w-5 h-5 mr-2" />
-                  Create New Invoice
+                <Button className="bg-black text-white hover:bg-gray-800 h-10 px-4">
+                  <Plus className="w-4 h-4 mr-2" /> Create Invoice
                 </Button>
               </DialogTrigger>
-              <DialogContent 
-                className="max-w-4xl max-h-[90vh] overflow-y-auto border-4 border-black p-0"
-                data-lenis-prevent
-              >
-                <DialogHeader className="p-6 pb-0">
-                  <DialogTitle className="text-2xl font-bold">New Invoice</DialogTitle>
-                  <DialogDescription>
-                    Fill in the details below to generate a new invoice.
-                  </DialogDescription>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border border-gray-200 p-0 bg-white sm:rounded-lg" data-lenis-prevent>
+                <DialogHeader className="p-6 pb-0 border-b border-gray-100">
+                  <DialogTitle className="text-xl font-bold">New Invoice</DialogTitle>
+                  <DialogDescription>Fill in the details below to generate a new invoice.</DialogDescription>
                 </DialogHeader>
-                <div className="p-6">
-                  <InvoiceForm onSuccess={handleInvoiceCreated} />
-                </div>
+                <InvoiceForm onSuccess={handleInvoiceCreated} />
               </DialogContent>
             </Dialog>
           </section>
@@ -114,20 +88,10 @@ export default function Home() {
             <InvoiceList refresh={refreshKey} onViewInvoice={setSelectedInvoice} />
           </section>
         </main>
-
-        <footer className="border-t-2 border-black bg-white mt-20">
-          <div className="max-w-7xl mx-auto px-4 py-8 text-center text-sm text-gray-600">
-            <p>Invoice Generator - Built with Next.js & Supabase</p>
-          </div>
-        </footer>
       </div>
 
       {selectedInvoice && (
-        <InvoicePreview 
-          invoice={selectedInvoice} 
-          onClose={() => setSelectedInvoice(null)}
-          onUpdate={() => setRefreshKey(prev => prev + 1)} 
-        />
+        <InvoicePreview invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} onUpdate={() => setRefreshKey(prev => prev + 1)} />
       )}
     </>
   );
